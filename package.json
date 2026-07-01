@@ -1,5 +1,5 @@
 {
-  "name": "temp-bni-ai",
+  "name": "bni-ai-techstack-auditor",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "framer-motion": "^12.42.0",
+    "lucide-react": "^1.22.0",
+    "mammoth": "^1.12.0",
+    "mermaid": "^11.16.0",
     "next": "16.2.9",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
