@@ -24,12 +24,25 @@ export async function POST(request: NextRequest) {
       model: config.model
     };
 
-    // 1. Perform RAG retrieval from project documents
+    // 1. Intelligent RAG context retrieval
     const docList = (documents || []) as IndexedDocument[];
-    const relevantChunks = RAGService.retrieve(prompt, docList, 5);
-    const retrievedContext = relevantChunks
-      .map(c => `[From file: ${c.source}]\n${c.text}`)
-      .join('\n\n');
+    let retrievedContext = '';
+    const totalLength = docList.reduce((sum, d) => sum + (d.text?.length || 0), 0);
+
+    if (totalLength > 0) {
+      if (totalLength < 35000) {
+        // For small/medium documents, pass the complete file contents to guarantee 100% reading accuracy
+        retrievedContext = docList
+          .map(d => `[Full content of file: ${d.filename}]\n${d.text}`)
+          .join('\n\n');
+      } else {
+        // For larger knowledge bases, retrieve the top 6 most relevant chunks
+        const relevantChunks = RAGService.retrieve(prompt, docList, 6);
+        retrievedContext = relevantChunks
+          .map(c => `[From file: ${c.source}]\n${c.text}`)
+          .join('\n\n');
+      }
+    }
 
     // 2. Build project tech stack description to provide as standard context
     let projectContext = '';

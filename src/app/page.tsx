@@ -6,6 +6,7 @@ import ProjectList from '@/components/ProjectList';
 import ProjectDetail from '@/components/ProjectDetail';
 import KnowledgeBase from '@/components/KnowledgeBase';
 import Settings from '@/components/Settings';
+import GeneralChat from '@/components/GeneralChat';
 import { dummyProjects, Project } from '@/services/dummyData';
 import { baselineAudits } from '@/services/baselineAudits';
 import { AIServiceConfig, AuditResponse } from '@/services/aiService';
@@ -23,10 +24,12 @@ export default function Home() {
   const [documents, setDocuments] = useState<IndexedDocument[]>([]);
   const [audits, setAudits] = useState<Record<string, AuditResponse>>(baselineAudits);
   const [chatHistories, setChatHistories] = useState<Record<string, { sender: 'user' | 'ai'; text: string; timestamp: Date }[]>>({});
+  const [generalChatHistory, setGeneralChatHistory] = useState<{ sender: 'user' | 'ai'; text: string; timestamp: Date }[]>([]);
 
   // Loading indicator states
   const [isAuditing, setIsAuditing] = useState(false);
   const [isChatting, setIsChatting] = useState(false);
+  const [isGeneralChatting, setIsGeneralChatting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   // 1. Hydrate persistent settings from localStorage
@@ -71,6 +74,19 @@ export default function Home() {
         setProjects(JSON.parse(savedProjects));
       } catch (e) {
         console.error('Error parsing projects from localStorage', e);
+      }
+    }
+
+    // Load general chat history
+    const savedGeneralChat = localStorage.getItem('bni_ai_general_chat');
+    if (savedGeneralChat) {
+      try {
+        setGeneralChatHistory(JSON.parse(savedGeneralChat).map((h: any) => ({
+          ...h,
+          timestamp: new Date(h.timestamp)
+        })));
+      } catch (e) {
+        console.error('Error parsing general chat history from localStorage', e);
       }
     }
   }, []);
@@ -141,12 +157,14 @@ export default function Home() {
       setConfig(null);
       setDocuments([]);
       setChatHistories({});
+      setGeneralChatHistory([]);
       setAudits(baselineAudits);
       setProjects(dummyProjects);
       localStorage.removeItem('bni_ai_config');
       localStorage.removeItem('bni_ai_docs');
       localStorage.removeItem('bni_ai_audits');
       localStorage.removeItem('bni_ai_projects');
+      localStorage.removeItem('bni_ai_general_chat');
     }
   };
 
@@ -274,6 +292,59 @@ export default function Home() {
     }
   };
 
+  const handleSendGeneralMessage = async (text: string) => {
+    if (!config || !config.apiKey) return;
+
+    const userMessage = { sender: 'user' as const, text, timestamp: new Date() };
+    const updatedHistory = [...generalChatHistory, userMessage];
+    setGeneralChatHistory(updatedHistory);
+    setIsGeneralChatting(true);
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          prompt: text,
+          history: generalChatHistory.map(h => ({
+            role: h.sender === 'user' ? 'user' : 'assistant',
+            content: h.text
+          })),
+          project: null, // General mode
+          config,
+          documents: documents // All documents loaded!
+        })
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson.error || 'Failed to generate reply.');
+      }
+
+      const data = await response.json();
+      const aiReply = { sender: 'ai' as const, text: data.reply, timestamp: new Date() };
+      
+      const newHistory = [...updatedHistory, aiReply];
+      setGeneralChatHistory(newHistory);
+      localStorage.setItem('bni_ai_general_chat', JSON.stringify(newHistory));
+
+    } catch (err: any) {
+      console.error('General chat error:', err);
+      const errorReply = {
+        sender: 'ai' as const,
+        text: `Error calling LLM: ${err.message || 'Failed to connect'}. Please verify your API Key configuration in the settings tab.`,
+        timestamp: new Date()
+      };
+      const newHistory = [...updatedHistory, errorReply];
+      setGeneralChatHistory(newHistory);
+      localStorage.setItem('bni_ai_general_chat', JSON.stringify(newHistory));
+    } finally {
+      setIsGeneralChatting(false);
+    }
+  };
+
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId);
     setActiveTab('projects'); // switch view context inside projects tab
@@ -357,6 +428,17 @@ export default function Home() {
             projects={projects} 
             onAddDocument={handleAddDocument}
             onRemoveDocument={handleRemoveDocument}
+          />
+        );
+      case 'general-chat':
+        return (
+          <GeneralChat 
+            history={generalChatHistory}
+            onSendMessage={handleSendGeneralMessage}
+            isChatting={isGeneralChatting}
+            hasApiKey={!!config?.apiKey}
+            documentsCount={documents.length}
+            documentsList={documents}
           />
         );
       case 'settings':

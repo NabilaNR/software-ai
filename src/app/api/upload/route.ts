@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFParse } from 'pdf-parse';
+import { decodePDFText } from 'unpdf';
 import { extractRawText } from 'mammoth';
 
 export async function POST(request: NextRequest) {
@@ -20,10 +20,8 @@ export async function POST(request: NextRequest) {
 
     if (extension === 'pdf') {
       try {
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const parser = new PDFParse(uint8Array);
-        const parsed = await parser.getText();
-        extractedText = parsed.text || '';
+        const parsed = await decodePDFText(arrayBuffer, { mergePages: true });
+        extractedText = (parsed.text as string) || '';
       } catch (err: any) {
         console.error('PDF parsing error:', err);
         return NextResponse.json({ error: 'Failed to parse PDF document: ' + err.message }, { status: 500 });

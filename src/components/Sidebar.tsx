@@ -4,7 +4,8 @@ import {
   FolderKanban, 
   Database, 
   Settings, 
-  Cpu
+  Cpu,
+  MessageSquare
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ export default function Sidebar({
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'projects', label: 'Projects', icon: FolderKanban },
+    { id: 'general-chat', label: 'General AI Chat', icon: MessageSquare },
     { id: 'knowledge-base', label: 'Knowledge Base', icon: Database },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -54,8 +56,8 @@ export default function Sidebar({
               key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
-                // When navigating away from details specific views, sometimes we keep the project selected or clear it
-                if (item.id === 'dashboard') {
+                // Reset selected project details view context when moving to top tabs
+                if (['dashboard', 'general-chat', 'knowledge-base', 'settings'].includes(item.id)) {
                   setSelectedProjectId(null);
                 }
               }}
