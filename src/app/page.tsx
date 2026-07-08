@@ -25,6 +25,7 @@ export default function Home() {
   const [audits, setAudits] = useState<Record<string, AuditResponse>>(baselineAudits);
   const [chatHistories, setChatHistories] = useState<Record<string, { sender: 'user' | 'ai'; text: string; timestamp: Date }[]>>({});
   const [generalChatHistory, setGeneralChatHistory] = useState<{ sender: 'user' | 'ai'; text: string; timestamp: Date }[]>([]);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   // Loading indicator states
   const [isAuditing, setIsAuditing] = useState(false);
@@ -89,12 +90,33 @@ export default function Home() {
         console.error('Error parsing general chat history from localStorage', e);
       }
     }
+
+    // Load theme from localStorage
+    const savedTheme = localStorage.getItem('bni_ai_theme');
+    if (savedTheme === 'light') {
+      setTheme('light');
+      document.documentElement.classList.add('light');
+    } else {
+      setTheme('dark');
+      document.documentElement.classList.remove('light');
+    }
   }, []);
 
   // Save changes to localStorage helper
   const saveConfig = (newConfig: AIServiceConfig) => {
     setConfig(newConfig);
     localStorage.setItem('bni_ai_config', JSON.stringify(newConfig));
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('bni_ai_theme', newTheme);
+    if (newTheme === 'light') {
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.remove('light');
+    }
   };
 
   const handleAddDocument = (newDoc: IndexedDocument) => {
@@ -144,6 +166,14 @@ export default function Home() {
         }
         return p;
       });
+      localStorage.setItem('bni_ai_projects', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleUpdateProject = (updatedProject: Project) => {
+    setProjects(prev => {
+      const updated = prev.map(p => p.id === updatedProject.id ? updatedProject : p);
       localStorage.setItem('bni_ai_projects', JSON.stringify(updated));
       return updated;
     });
@@ -353,7 +383,7 @@ export default function Home() {
   // Prevent SSR mismatch flashes
   if (!mounted) {
     return (
-      <div className="flex-1 bg-[#070b19] flex items-center justify-center">
+      <div className="flex-1 bg-dark-bg text-slate-100 flex items-center justify-center">
         <div className="w-10 h-10 rounded-full border-t-2 border-blue-500 border-r-2 border-transparent animate-spin" />
       </div>
     );
@@ -389,11 +419,9 @@ export default function Home() {
             config={config}
             onRunLiveAudit={handleRunLiveAudit}
             isAuditing={isAuditing}
-            chatHistory={chatHistories[selectedProjectId] || []}
-            onSendMessage={handleSendMessage}
-            isChatting={isChatting}
             onToggleActive={handleToggleActive}
             onUpdateDescription={handleUpdateDescription}
+            onUpdateProject={handleUpdateProject}
           />
         );
       }
@@ -419,6 +447,7 @@ export default function Home() {
             audits={audits} 
             onSelectProject={handleSelectProject} 
             onAddProject={handleAddProject}
+            config={config}
           />
         );
       case 'knowledge-base':
@@ -428,6 +457,8 @@ export default function Home() {
             projects={projects} 
             onAddDocument={handleAddDocument}
             onRemoveDocument={handleRemoveDocument}
+            onUpdateProject={handleUpdateProject}
+            config={config}
           />
         );
       case 'general-chat':
@@ -461,13 +492,15 @@ export default function Home() {
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden h-screen bg-[#070b19]">
+    <div className="flex-1 flex overflow-hidden h-screen bg-dark-bg text-slate-100 transition-colors duration-300">
       {/* Sidebar navigation */}
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
         selectedProjectId={selectedProjectId}
         setSelectedProjectId={setSelectedProjectId}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Main panel */}

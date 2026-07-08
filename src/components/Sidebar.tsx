@@ -5,7 +5,9 @@ import {
   Database, 
   Settings, 
   Cpu,
-  MessageSquare
+  MessageSquare,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -13,13 +15,17 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   selectedProjectId: string | null;
   setSelectedProjectId: (id: string | null) => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 export default function Sidebar({ 
   activeTab, 
   setActiveTab,
   selectedProjectId,
-  setSelectedProjectId
+  setSelectedProjectId,
+  theme,
+  onToggleTheme
 }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -74,8 +80,32 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Footer / User Profile Summary */}
-      <div className="p-4 border-t border-slate-900 bg-slate-950/40">
+      {/* Footer / User Profile & Theme Toggle */}
+      <div className="p-4 border-t border-slate-900 bg-slate-950/40 space-y-3">
+        {/* Theme Toggle Button */}
+        <button
+          onClick={onToggleTheme}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900/40 border border-slate-800/40 text-xs font-semibold text-slate-450 hover:text-slate-200 hover:bg-slate-900/80 transition-all duration-200 select-none cursor-pointer"
+        >
+          <span className="flex items-center gap-2">
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-4 h-4 text-amber-500" />
+                Light Mode
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-indigo-400" />
+                Dark Mode
+              </>
+            )}
+          </span>
+          <span className="text-[9px] text-slate-500 font-mono uppercase tracking-wider">
+            {theme}
+          </span>
+        </button>
+
+        {/* Profile Card */}
         <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/40 border border-slate-800/40">
           <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300">
             EA

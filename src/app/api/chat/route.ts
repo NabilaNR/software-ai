@@ -78,7 +78,7 @@ Always give specific reasons and technical trade-offs (e.g. why upgrading from L
       history: history || []
     });
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply: reply.replace(/\*/g, '') });
   } catch (error: any) {
     console.error('API Chat Route error:', error);
     return NextResponse.json(

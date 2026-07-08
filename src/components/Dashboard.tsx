@@ -229,7 +229,7 @@ export default function Dashboard({ projects, audits, onSelectProject }: Dashboa
             </div>
             
             <div className="space-y-3.5">
-              <div className="p-3.5 rounded-xl bg-red-950/20 border border-red-900/30 text-xs text-red-200/90 leading-relaxed">
+              <div className="p-3.5 rounded-xl bg-red-950/20 border border-red-900/30 text-xs text-slate-300 leading-relaxed">
                 <div className="font-bold flex items-center gap-1 mb-1 text-red-400">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   Legacy Core Risks
@@ -237,7 +237,7 @@ export default function Dashboard({ projects, audits, onSelectProject }: Dashboa
                 Legacy loan server running on WildFly 14 and Oracle 12c requires an immediate sandbox modernization plan due to unpatched compliance vulnerabilities.
               </div>
 
-              <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-900/30 text-xs text-amber-200/90 leading-relaxed">
+              <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-900/30 text-xs text-slate-300 leading-relaxed">
                 <div className="font-bold flex items-center gap-1 mb-1 text-amber-400">
                   <TrendingUp className="w-4 h-4 shrink-0" />
                   Cost Savings Tip
@@ -245,7 +245,7 @@ export default function Dashboard({ projects, audits, onSelectProject }: Dashboa
                 Migrate Payments Gateway GKE cluster nodes to GKE Autopilot to automatically reclaim ~30% in idle cloud hosting costs.
               </div>
 
-              <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-900/30 text-xs text-blue-200/90 leading-relaxed">
+              <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-900/30 text-xs text-slate-300 leading-relaxed">
                 <div className="font-bold flex items-center gap-1 mb-1 text-blue-400">
                   <Layers className="w-4 h-4 shrink-0" />
                   Performance Upgrade

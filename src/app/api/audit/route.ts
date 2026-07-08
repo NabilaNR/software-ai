@@ -38,7 +38,8 @@ ${project.techStack.map((item: any) => `- ${item.layer}: ${item.technology} (Ver
       documentsText
     });
 
-    return NextResponse.json(auditResponse);
+    const cleanedString = JSON.stringify(auditResponse).replace(/\*/g, '');
+    return NextResponse.json(JSON.parse(cleanedString));
   } catch (error: any) {
     console.error('API Audit Route error:', error);
     return NextResponse.json(

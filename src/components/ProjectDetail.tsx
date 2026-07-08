@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Project } from '@/services/dummyData';
 import { AuditResponse, AIServiceConfig } from '@/services/aiService';
 import MermaidChart from './MermaidChart';
-import AIChat from './AIChat';
 import { IndexedDocument } from '@/services/ragService';
 import { checkVersionStatus } from '@/services/versionChecker';
 import { 
@@ -25,7 +24,10 @@ import {
   Save,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  Plus
 } from 'lucide-react';
 
 interface ProjectDetailProps {
@@ -36,14 +38,12 @@ interface ProjectDetailProps {
   config: AIServiceConfig | null;
   onRunLiveAudit: (projectId: string) => Promise<void>;
   isAuditing: boolean;
-  chatHistory: { sender: 'user' | 'ai'; text: string; timestamp: Date }[];
-  onSendMessage: (text: string) => Promise<void>;
-  isChatting: boolean;
   onToggleActive: (projectId: string) => void;
   onUpdateDescription: (projectId: string, newDesc: string) => void;
+  onUpdateProject: (updatedProject: Project) => void;
 }
 
-type TabType = 'overview' | 'techstack' | 'architecture' | 'audit' | 'chat';
+type TabType = 'overview' | 'techstack' | 'architecture' | 'audit';
 
 export default function ProjectDetail({
   project,
@@ -53,22 +53,77 @@ export default function ProjectDetail({
   config,
   onRunLiveAudit,
   isAuditing,
-  chatHistory,
-  onSendMessage,
-  isChatting,
   onToggleActive,
-  onUpdateDescription
+  onUpdateDescription,
+  onUpdateProject
 }: ProjectDetailProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [editDescText, setEditDescText] = useState(project.description);
 
+  // Recommendations state
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [isGeneratingRecs, setIsGeneratingRecs] = useState(false);
+  const [recError, setRecError] = useState<string | null>(null);
+
+  const handleGenerateRecommendations = async () => {
+    if (!config || !config.apiKey || !config.apiKey.trim()) {
+      setRecError('API Key is required to generate AI recommendations. Please add your key in the Settings page.');
+      return;
+    }
+    setIsGeneratingRecs(true);
+    setRecError(null);
+    try {
+      const res = await fetch('/api/recommend-stack', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: project.name,
+          description: project.description,
+          config: config
+        })
+      });
+
+      if (!res.ok) {
+        const errorJson = await res.json();
+        throw new Error(errorJson.error || 'Failed to generate recommendations.');
+      }
+
+      const data = await res.json();
+      setRecommendations(data.recommendations || []);
+    } catch (err: any) {
+      console.error(err);
+      setRecError(err.message || 'An error occurred while calling the recommendation service.');
+    } finally {
+      setIsGeneratingRecs(false);
+    }
+  };
+
+  const handleApplyRecommendations = () => {
+    const formattedStack = recommendations.map(rec => ({
+      layer: rec.layer,
+      technology: rec.technology,
+      version: rec.version,
+      supportStatus: rec.supportStatus || 'Supported',
+      risk: rec.risk || 'Low'
+    }));
+
+    const updatedProject = {
+      ...project,
+      techStack: formattedStack
+    };
+
+    onUpdateProject(updatedProject);
+    setRecommendations([]);
+  };
+
   const tabs: { id: TabType; label: string; icon: any }[] = [
     { id: 'overview', label: 'Overview', icon: Globe },
     { id: 'techstack', label: 'Tech Stack', icon: Cpu },
     { id: 'architecture', label: 'Architecture', icon: Network },
-    { id: 'audit', label: 'AI Audit', icon: ShieldAlert },
-    { id: 'chat', label: 'AI Chat', icon: HelpCircle }
+    { id: 'audit', label: 'AI Audit', icon: ShieldAlert }
   ];
 
   // Helper for rendering badges
@@ -309,6 +364,71 @@ export default function ProjectDetail({
 
         {/* TECH STACK TAB */}
         {activeTab === 'techstack' && (() => {
+          if (project.techStack.length === 0) {
+            return (
+              <div className="space-y-6">
+                <div className="glass-panel p-8 rounded-2xl text-center space-y-4 flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+                    <Cpu className="w-6 h-6 text-slate-500 animate-pulse" />
+                  </div>
+                  <div className="max-w-md">
+                    <h3 className="text-sm font-bold text-slate-200">No Tech Stack Configured</h3>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      This project specification document did not contain any technology stack details. You can let AI recommend a standard BNI architecture stack based on the project's profile.
+                    </p>
+                  </div>
+                  
+                  {isGeneratingRecs ? (
+                    <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 animate-pulse">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                      AI is generating architecture recommendations...
+                    </div>
+                  ) : recommendations.length > 0 ? (
+                    <div className="w-full max-w-xl text-left border border-slate-800/80 bg-slate-950/20 p-4 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                        <span className="text-xs font-bold text-slate-200">Suggested BNI Enterprise Stack</span>
+                        <button
+                          type="button"
+                          onClick={handleApplyRecommendations}
+                          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-[10px] font-bold text-white rounded-lg shadow-md transition-all hover:scale-[1.02] cursor-pointer"
+                        >
+                          Apply Stack to Project
+                        </button>
+                      </div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        {recommendations.map((rec, idx) => (
+                          <div key={idx} className="p-2.5 bg-slate-900 border border-slate-850/60 rounded-lg text-xs space-y-1">
+                            <div className="flex justify-between items-center font-semibold">
+                              <span className="text-slate-200">{rec.layer}: {rec.technology} ({rec.version})</span>
+                              <span className="text-[9px] px-1.5 py-0.25 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase font-bold shrink-0">Recommended</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 leading-normal">{rec.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleGenerateRecommendations}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white rounded-xl shadow-lg transition-all hover:scale-[1.02] cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Generate Recommended Stack
+                    </button>
+                  )}
+
+                  {recError && (
+                    <div className="p-3 rounded-xl bg-red-950/20 border border-red-900/30 text-[10px] text-red-400 flex gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{recError}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
           const outdatedItems = project.techStack
             .map(item => {
               const check = checkVersionStatus(item.technology, item.version);
@@ -580,17 +700,6 @@ export default function ProjectDetail({
               </div>
             )}
           </div>
-        )}
-
-        {/* AI CHAT TAB */}
-        {activeTab === 'chat' && (
-          <AIChat 
-            project={project} 
-            history={chatHistory} 
-            onSendMessage={onSendMessage} 
-            isChatting={isChatting} 
-            hasApiKey={!!hasApiKey}
-          />
         )}
       </div>
     </div>

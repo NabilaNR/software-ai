@@ -14,21 +14,29 @@ import {
   HelpCircle
 } from 'lucide-react';
 
+import { AuditResponse, AIServiceConfig } from '@/services/aiService';
+import { TechStackItem } from '@/services/dummyData';
+
 interface KnowledgeBaseProps {
   documents: IndexedDocument[];
   projects: Project[];
   onAddDocument: (doc: IndexedDocument) => void;
   onRemoveDocument: (id: string) => void;
+  onUpdateProject: (updatedProject: Project) => void;
+  config: AIServiceConfig | null;
 }
 
 export default function KnowledgeBase({
   documents,
   projects,
   onAddDocument,
-  onRemoveDocument
+  onRemoveDocument,
+  onUpdateProject,
+  config
 }: KnowledgeBaseProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('global');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStep, setUploadStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +59,7 @@ export default function KnowledgeBase({
 
     setError(null);
     setIsUploading(true);
+    setUploadStep('Extracting document text...');
 
     try {
       const formData = new FormData();
@@ -87,6 +96,68 @@ export default function KnowledgeBase({
       };
 
       onAddDocument(newDoc);
+
+      // Perform AI Analysis & Mapping if associated with a specific project
+      if (selectedProjectId !== 'global' && data.text && data.text.trim()) {
+        if (config && config.apiKey && config.apiKey.trim()) {
+          setUploadStep('AI is mapping specifications & technology stack...');
+          
+          try {
+            const extractRes = await fetch('/api/extract-project', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                projectName: getProjectName(selectedProjectId),
+                documentText: data.text,
+                config: config
+              })
+            });
+
+            if (extractRes.ok) {
+              const extractedProject = await extractRes.json();
+              const existingProject = projects.find(p => p.id === selectedProjectId);
+              if (existingProject) {
+                setUploadStep('Integrating mapped technologies with inventory...');
+                
+                const mergedTechStack = [...existingProject.techStack];
+                (extractedProject.techStack || []).forEach((newItem: TechStackItem) => {
+                  const matchIdx = mergedTechStack.findIndex(
+                    item => item.technology.toLowerCase() === newItem.technology.toLowerCase()
+                  );
+                  if (matchIdx > -1) {
+                    mergedTechStack[matchIdx] = {
+                      ...mergedTechStack[matchIdx],
+                      version: newItem.version || mergedTechStack[matchIdx].version,
+                      supportStatus: newItem.supportStatus || mergedTechStack[matchIdx].supportStatus,
+                      risk: newItem.risk || mergedTechStack[matchIdx].risk,
+                      layer: newItem.layer || mergedTechStack[matchIdx].layer
+                    };
+                  } else {
+                    mergedTechStack.push(newItem);
+                  }
+                });
+
+                const updatedProject: Project = {
+                  ...existingProject,
+                  owner: extractedProject.owner || existingProject.owner,
+                  description: extractedProject.description
+                    ? (existingProject.description + '\n\n[Auto-Mapped from ' + file.name + ']: ' + extractedProject.description)
+                    : existingProject.description,
+                  estimatedMonthlyCost: Number(extractedProject.estimatedMonthlyCost) || existingProject.estimatedMonthlyCost,
+                  techStack: mergedTechStack,
+                  architectureDiagram: extractedProject.architectureDiagram || existingProject.architectureDiagram
+                };
+
+                onUpdateProject(updatedProject);
+              }
+            }
+          } catch (aiErr) {
+            console.error('AI Mapping error during document upload:', aiErr);
+          }
+        }
+      }
 
       // Simulate the RAG indexing pipeline states: Indexed -> Embedding -> Ready
       setTimeout(() => {
@@ -192,8 +263,8 @@ export default function KnowledgeBase({
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
                   <div>
-                    <span className="text-xs font-bold text-slate-300">Extracting Document Text...</span>
-                    <span className="text-[10px] text-slate-500 block mt-1">Generating index tokens</span>
+                    <span className="text-xs font-bold text-slate-350">{uploadStep || 'Extracting Document Text...'}</span>
+                    <span className="text-[10px] text-slate-500 block mt-1">AI analysis pipeline is active</span>
                   </div>
                 </div>
               ) : (

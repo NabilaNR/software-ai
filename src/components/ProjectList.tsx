@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Project, TechStackItem } from '@/services/dummyData';
-import { AuditResponse } from '@/services/aiService';
+import { AuditResponse, AIServiceConfig } from '@/services/aiService';
 import { 
   Search, 
   Layers, 
@@ -12,7 +12,11 @@ import {
   Plus,
   Trash2,
   ChevronLeft,
-  Briefcase
+  Briefcase,
+  Upload,
+  FileText,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 
 interface ProjectListProps {
@@ -20,27 +24,19 @@ interface ProjectListProps {
   audits: Record<string, AuditResponse>;
   onSelectProject: (id: string) => void;
   onAddProject: (newProject: Project) => void;
+  config: AIServiceConfig | null;
 }
 
-export default function ProjectList({ projects, audits, onSelectProject, onAddProject }: ProjectListProps) {
+export default function ProjectList({ projects, audits, onSelectProject, onAddProject, config }: ProjectListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  // Form State
+  // Simplified Form State
   const [name, setName] = useState('');
-  const [owner, setOwner] = useState('');
   const [description, setDescription] = useState('');
-  const [production, setProduction] = useState('');
-  const [staging, setStaging] = useState('');
-  const [development, setDevelopment] = useState('');
-  const [repository, setRepository] = useState('');
-  const [cost, setCost] = useState('1000');
-  const [techStack, setTechStack] = useState<TechStackItem[]>([
-    { layer: 'Frontend', technology: 'React', version: '18.2.0', supportStatus: 'Supported', risk: 'Low' }
-  ]);
-  const [diagram, setDiagram] = useState(`flowchart TD
-  Client[Client Browser] --> WebServer[Backend Service]
-  WebServer --> Database[(Database)]`);
+  const [file, setFile] = useState<File | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
   const filteredProjects = projects.filter(project => {
     const query = searchQuery.toLowerCase();
@@ -52,71 +48,107 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
     return nameMatch || ownerMatch || techMatch;
   });
 
-  const handleAddTechItem = () => {
-    setTechStack(prev => [
-      ...prev,
-      { layer: 'Backend', technology: '', version: '', supportStatus: 'Supported', risk: 'Low' }
-    ]);
-  };
-
-  const handleRemoveTechItem = (idx: number) => {
-    setTechStack(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleTechItemChange = (idx: number, field: keyof TechStackItem, value: string) => {
-    setTechStack(prev => prev.map((item, i) => {
-      if (i === idx) {
-        return { ...item, [field]: value };
-      }
-      return item;
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !owner) return;
+    if (!name.trim()) {
+      setExtractError('Project name is required.');
+      return;
+    }
+    if (!file) {
+      setExtractError('Please upload a specification document (PDF, DOCX, TXT, MD, etc.) to analyze the project.');
+      return;
+    }
+    if (!config || !config.apiKey || !config.apiKey.trim()) {
+      setExtractError('API Key is required to extract project profiles using AI. Please configure it in Settings.');
+      return;
+    }
 
-    const projectId = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
-    const newProject: Project = {
-      id: projectId,
-      name,
-      owner,
-      description,
-      environments: {
-        production: production || 'https://bni.co.id',
-        staging: staging || 'https://staging.bni.co.id',
-        development: development || 'https://dev.bni.co.id'
-      },
-      repository: repository || 'https://github.com/bni-enterprise/' + projectId,
-      estimatedMonthlyCost: Number(cost) || 0,
-      techStack,
-      architectureDiagram: diagram
-    };
+    setIsExtracting(true);
+    setExtractError(null);
 
-    onAddProject(newProject);
-    
-    // Reset Form
-    setName('');
-    setOwner('');
-    setDescription('');
-    setProduction('');
-    setStaging('');
-    setDevelopment('');
-    setRepository('');
-    setCost('1000');
-    setTechStack([{ layer: 'Frontend', technology: 'React', version: '18.2.0', supportStatus: 'Supported', risk: 'Low' }]);
-    setDiagram(`flowchart TD
-  Client[Client Browser] --> WebServer[Backend Service]
-  WebServer --> Database[(Database)]`);
-    
-    setIsCreating(false);
+    try {
+      // 1. Upload file to /api/upload to extract raw text content
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      uploadData.append('projectId', 'temporary-extraction');
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadData
+      });
+
+      if (!uploadRes.ok) {
+        const errorJson = await uploadRes.json();
+        throw new Error(errorJson.error || 'Failed to extract text from the document.');
+      }
+
+      const uploadResult = await uploadRes.json();
+      const extractedText = uploadResult.text;
+
+      if (!extractedText || !extractedText.trim()) {
+        throw new Error('No readable text content found in the uploaded document.');
+      }
+
+      // 2. Call /api/extract-project to run the AI extraction
+      const extractRes = await fetch('/api/extract-project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          projectName: name,
+          documentText: extractedText,
+          config: config
+        })
+      });
+
+      if (!extractRes.ok) {
+        const errorJson = await extractRes.json();
+        throw new Error(errorJson.error || 'AI Extraction failed. Please verify your document structure.');
+      }
+
+      const extractedProject = await extractRes.json();
+
+      // Create a final Project object
+      const projectId = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+      const newProject: Project = {
+        id: projectId,
+        name: name,
+        owner: extractedProject.owner || '',
+        description: description.trim() || extractedProject.description || '',
+        environments: extractedProject.environments || {
+          production: '',
+          staging: '',
+          development: ''
+        },
+        repository: extractedProject.repository || '',
+        estimatedMonthlyCost: Number(extractedProject.estimatedMonthlyCost) || 0,
+        techStack: extractedProject.techStack || [],
+        architectureDiagram: extractedProject.architectureDiagram || '',
+        isActive: true
+      };
+
+      onAddProject(newProject);
+      
+      // Reset Form State
+      setName('');
+      setDescription('');
+      setFile(null);
+      setExtractError(null);
+      setIsCreating(false);
+    } catch (err: any) {
+      console.error('Error during project onboarding extraction:', err);
+      setExtractError(err.message || 'An unexpected error occurred during document parsing.');
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   if (isCreating) {
     return (
       <div className="space-y-6">
         {/* Form Header */}
-        <div className="flex items-center gap-3 pb-4 border-b border-slate-800/60">
+        <div className="flex items-center gap-3 pb-4 border-b border-slate-805/60">
           <button
             onClick={() => setIsCreating(false)}
             className="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:bg-slate-850 hover:border-slate-700 text-slate-400 hover:text-slate-200 transition-all duration-200"
@@ -125,216 +157,108 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
           </button>
           <div>
             <h2 className="text-xl font-bold text-slate-100">Register New Project</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Define metadata, technology stacks, and Mermaid layouts.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Let AI read your specification document and configure the project automatically.</p>
           </div>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="glass-panel p-6 rounded-2xl space-y-6 max-w-4xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="glass-panel p-6 rounded-2xl space-y-6 max-w-2xl">
+          {extractError && (
+            <div className="p-4 rounded-xl bg-red-950/40 border border-red-900/30 flex gap-3 text-xs text-red-200/90 leading-relaxed shadow-lg">
+              <AlertCircle className="w-4.5 h-4.5 shrink-0 text-red-500 animate-pulse" />
+              <div>
+                <span className="font-bold block mb-0.5 text-red-400">Onboarding Error</span>
+                {extractError}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-4">
             {/* Project Name */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-400">Project Name *</label>
               <input
                 type="text"
                 required
+                disabled={isExtracting}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., BNI Cash Management Service"
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all"
+                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all disabled:opacity-50"
               />
             </div>
 
-            {/* Owner */}
+            {/* Project Description */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">System Owner / Division *</label>
-              <input
-                type="text"
-                required
-                value={owner}
-                onChange={(e) => setOwner(e.target.value)}
-                placeholder="e.g., Transactional Banking Technology"
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all"
-              />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-xs font-semibold text-slate-400">Description</label>
+              <label className="text-xs font-semibold text-slate-400">Project Description (Optional)</label>
               <textarea
+                disabled={isExtracting}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                placeholder="Describe the business objectives and architecture of this project..."
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all"
+                placeholder="Briefly describe the business goals or purpose of this system..."
+                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all disabled:opacity-50"
               />
             </div>
 
-            {/* Cost & Repo */}
+            {/* Document Upload */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Estimated Monthly Cost ($ USD)</label>
-              <input
-                type="number"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Source Repository URL</label>
-              <input
-                type="text"
-                value={repository}
-                onChange={(e) => setRepository(e.target.value)}
-                placeholder="e.g., https://github.com/bni-enterprise/cash-mgmt.git"
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all"
-              />
-            </div>
-
-            {/* Env details */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Production Endpoint</label>
-              <input
-                type="text"
-                value={production}
-                onChange={(e) => setProduction(e.target.value)}
-                placeholder="e.g., https://cms.bni.co.id"
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Staging Endpoint</label>
-              <input
-                type="text"
-                value={staging}
-                onChange={(e) => setStaging(e.target.value)}
-                placeholder="https://staging.cms.bni.co.id"
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Tech Stack List section */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-widest">Technology Stack Configuration</h3>
-              <button
-                type="button"
-                onClick={handleAddTechItem}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 hover:border-blue-500 text-[10px] text-blue-400 hover:text-white rounded-lg font-bold transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Item
-              </button>
-            </div>
-
-            {/* List items */}
-            <div className="space-y-3">
-              {techStack.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2 bg-slate-950/45 p-3 rounded-xl border border-slate-900 items-end">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500">Layer</label>
-                    <input
-                      type="text"
-                      required
-                      value={item.layer}
-                      onChange={(e) => handleTechItemChange(idx, 'layer', e.target.value)}
-                      placeholder="e.g. Frontend"
-                      className="w-full text-[11px] bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500">Technology</label>
-                    <input
-                      type="text"
-                      required
-                      value={item.technology}
-                      onChange={(e) => handleTechItemChange(idx, 'technology', e.target.value)}
-                      placeholder="e.g. React"
-                      className="w-full text-[11px] bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500">Version</label>
-                    <input
-                      type="text"
-                      required
-                      value={item.version}
-                      onChange={(e) => handleTechItemChange(idx, 'version', e.target.value)}
-                      placeholder="e.g. 18.2.0"
-                      className="w-full text-[11px] bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">Status</label>
-                      <select
-                        value={item.supportStatus}
-                        onChange={(e) => handleTechItemChange(idx, 'supportStatus', e.target.value)}
-                        className="w-full text-[11px] bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-slate-200"
-                      >
-                        <option value="Supported">Supported</option>
-                        <option value="Warning">Warning</option>
-                        <option value="Deprecated">Deprecated</option>
-                        <option value="End of Life">End of Life</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-500">Risk</label>
-                      <select
-                        value={item.risk}
-                        onChange={(e) => handleTechItemChange(idx, 'risk', e.target.value)}
-                        className="w-full text-[11px] bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-slate-200"
-                      >
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Critical">Critical</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      disabled={techStack.length === 1}
-                      onClick={() => handleRemoveTechItem(idx)}
-                      className="p-2.5 bg-red-950/10 hover:bg-red-950/30 text-red-500 hover:text-red-400 border border-transparent hover:border-red-900/40 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+              <label className="text-xs font-semibold text-slate-400">System Architecture Spec / Document *</label>
+              <div className="relative border-2 border-dashed border-slate-800/80 hover:border-blue-500/40 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 bg-slate-950/40 transition-all duration-300">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt,.md"
+                  disabled={isExtracting}
+                  onChange={(e) => {
+                    const selectedFile = e.target.files?.[0];
+                    if (selectedFile) setFile(selectedFile);
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:pointer-events-none"
+                />
+                
+                <div className="w-12 h-12 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-450">
+                  {file ? (
+                    <FileText className="w-6 h-6 text-blue-400 animate-bounce" />
+                  ) : (
+                    <Upload className="w-6 h-6" />
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Architecture diagram code */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400">Mermaid Architecture Flowchart</label>
-            <textarea
-              value={diagram}
-              onChange={(e) => setDiagram(e.target.value)}
-              rows={4}
-              className="w-full text-[11px] font-mono bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-200 transition-all"
-            />
+                <div className="text-center">
+                  <p className="text-xs font-bold text-slate-300">
+                    {file ? file.name : 'Choose a file or drag it here'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Accepts PDF, DOCX, TXT, or MD spec docs (Max 15MB)
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3 pt-2 border-t border-slate-800/60 justify-end">
+          <div className="flex gap-3 pt-4 border-t border-slate-800/60 justify-end items-center">
+            {isExtracting && (
+              <div className="flex items-center gap-2 mr-auto text-xs font-semibold text-blue-400 animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                AI is extracting stack & drawing architecture diagram...
+              </div>
+            )}
+            
             <button
               type="button"
+              disabled={isExtracting}
               onClick={() => setIsCreating(false)}
-              className="px-5 py-2.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-bold transition-all"
+              className="px-5 py-2.5 bg-slate-900 border border-slate-800 text-slate-450 hover:text-slate-200 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all hover:scale-[1.02]"
+              disabled={isExtracting}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-700/60 text-white font-bold rounded-xl text-xs transition-all hover:scale-[1.02] disabled:hover:scale-100 disabled:opacity-80 cursor-pointer"
             >
-              Save Project
+              {isExtracting ? 'Extracting...' : 'Save & Extract stack using AI'}
             </button>
           </div>
         </form>
