@@ -24,10 +24,11 @@ interface ProjectListProps {
   audits: Record<string, AuditResponse>;
   onSelectProject: (id: string) => void;
   onAddProject: (newProject: Project) => void;
+  onDeleteProject: (projectId: string) => void;
   config: AIServiceConfig | null;
 }
 
-export default function ProjectList({ projects, audits, onSelectProject, onAddProject, config }: ProjectListProps) {
+export default function ProjectList({ projects, audits, onSelectProject, onAddProject, onDeleteProject, config }: ProjectListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -392,16 +393,24 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
                 {/* Bottom Section */}
                 <div className="mt-5 pt-4 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-0.5">
-                      <DollarSign className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="font-semibold text-slate-300">{cost.toLocaleString()}</span>
-                      <span className="text-[10px] text-slate-500">/mo</span>
-                    </div>
-
                     <div className={`flex items-center gap-1 border px-2 py-0.5 rounded-full text-[10px] font-semibold ${riskColor}`}>
                       <Shield className="w-3 h-3" />
                       {overallRisk} Risk
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete "${project.name}"?`)) {
+                          onDeleteProject(project.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-red-950/20 border border-red-900/30 text-red-400 hover:bg-red-900 hover:text-white hover:border-red-700 transition-all duration-200 cursor-pointer"
+                      title="Delete Project"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
                   <span className="text-blue-400 font-semibold flex items-center gap-0.5 hover:translate-x-0.5 transition-transform duration-200">

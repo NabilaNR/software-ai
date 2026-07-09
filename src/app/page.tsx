@@ -145,6 +145,22 @@ export default function Home() {
     });
   };
 
+  const handleDeleteProject = (projectId: string) => {
+    setProjects(prev => {
+      const updated = prev.filter(p => p.id !== projectId);
+      localStorage.setItem('bni_ai_projects', JSON.stringify(updated));
+      return updated;
+    });
+    setDocuments(prev => {
+      const updated = prev.filter(d => d.projectId !== projectId);
+      localStorage.setItem('bni_ai_docs', JSON.stringify(updated));
+      return updated;
+    });
+    if (selectedProjectId === projectId) {
+      setSelectedProjectId(null);
+    }
+  };
+
   const handleToggleActive = (projectId: string) => {
     setProjects(prev => {
       const updated = prev.map(p => {
@@ -447,6 +463,7 @@ export default function Home() {
             audits={audits} 
             onSelectProject={handleSelectProject} 
             onAddProject={handleAddProject}
+            onDeleteProject={handleDeleteProject}
             config={config}
           />
         );

@@ -74,7 +74,7 @@ export default function Dashboard({ projects, audits, onSelectProject }: Dashboa
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Projects */}
         <div className="glass-panel p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between group glass-panel-hover">
           <div className="flex justify-between items-start">
@@ -111,25 +111,7 @@ export default function Dashboard({ projects, audits, onSelectProject }: Dashboa
           </div>
         </div>
 
-        {/* Estimated Costs */}
-        <div className="glass-panel p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between group glass-panel-hover">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estimated Monthly Cost</p>
-              <h3 className="text-3xl font-bold text-slate-100 mt-2">${totalCost.toLocaleString()}</h3>
-            </div>
-            <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400">
-              <DollarSign className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="text-xs text-slate-400 mt-4 flex items-center gap-1.5">
-            <span className="text-emerald-500 font-bold flex items-center gap-0.5">
-              <TrendingDown className="w-3.5 h-3.5" />
-              ${Math.round(totalSavingsPotential).toLocaleString()}
-            </span>
-            <span>est. savings potential</span>
-          </div>
-        </div>
+
 
         {/* Health Score */}
         <div className="glass-panel p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between group glass-panel-hover">
@@ -201,12 +183,7 @@ export default function Dashboard({ projects, audits, onSelectProject }: Dashboa
                   </div>
 
                   <div className="flex items-center gap-4 shrink-0">
-                    <div className="text-right">
-                      <div className="text-xs font-semibold text-slate-300">${cost.toLocaleString()} / mo</div>
-                      {saving > 0 && (
-                        <div className="text-[10px] text-emerald-500 font-medium">Save ~${saving.toLocaleString()}</div>
-                      )}
-                    </div>
+
                     <button 
                       onClick={() => onSelectProject(project.id)}
                       className="p-2 rounded-lg bg-slate-800/40 hover:bg-blue-600 border border-slate-700/60 hover:border-blue-500 text-slate-400 hover:text-white transition-all duration-200"

@@ -55,7 +55,7 @@ You must respond strictly with a valid JSON object matching the following struct
       "risk": "Low" | "Medium" | "High" | "Critical"
     }
   ],
-  "architectureDiagram": "A clean, valid Mermaid.js flowchart code. It must strictly model the actual architecture flow, system integrations, data flow, and network topologies described in the document. Do NOT generate generic Client -> Backend -> DB diagrams unless that is the only flow described in the document. Translate the document's actual component layouts (e.g., API gateways, multiple microservices, specific database instances, message queues) into the flowchart."
+  "architectureDiagram": "A clean, valid Mermaid.js flowchart code (e.g. flowchart TD or flowchart LR). It must strictly model the actual architecture flow, system integrations, transaction lifecycle, request routes, or business processes described inside the document. Do NOT generate generic Client -> Backend -> DB diagrams. Instead: 1) Scan the document for specific system components, microservices, databases, file storage, queues, gateways, third-party APIs, or user roles. 2) Scrape the actual data flows, workflow sequences, or request/response loops described in the text. 3) Map these components and flows exactly into the Mermaid flowchart. 4) Use quoted labels for node descriptions (e.g., node1[\"Core Banking API\"]) to prevent syntax errors. 5) If the document describes a network zones architecture, group them using subgraphs. 6) If no architecture components, workflows, or data paths are described in the document, return an empty string (\"\")."
 }
 
 Do not include any markdown code block wrappers (like \`\`\`json) in your output, respond with raw JSON only. Ensure the diagram is valid Mermaid code.`;

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Project } from '@/services/dummyData';
 import { AuditResponse, AIServiceConfig } from '@/services/aiService';
 import MermaidChart from './MermaidChart';
@@ -27,7 +27,8 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
-  Plus
+  Plus,
+  Upload
 } from 'lucide-react';
 
 interface ProjectDetailProps {
@@ -431,8 +432,28 @@ export default function ProjectDetail({
 
           const outdatedItems = project.techStack
             .map(item => {
-              const check = checkVersionStatus(item.technology, item.version);
-              return check.isOutdated ? { item, check } : null;
+              const staticCheck = checkVersionStatus(item.technology, item.version);
+              
+              // Find matching AI Audit recommendation
+              const aiRec = audit?.recommendations?.find(r => {
+                const layerMatch = r.layer.toLowerCase() === item.layer.toLowerCase();
+                const currentTechWord = r.currentTech.split(' ')[0].toLowerCase();
+                const techMatch = r.currentTech.toLowerCase().includes(item.technology.toLowerCase()) ||
+                                  item.technology.toLowerCase().includes(currentTechWord);
+                return layerMatch && techMatch;
+              });
+
+              if (staticCheck.isOutdated || aiRec) {
+                return {
+                  item,
+                  check: {
+                    isOutdated: true,
+                    latestVersion: aiRec?.recommendedTech || staticCheck.latestVersion || 'LTS Release',
+                    reason: aiRec?.benefit || staticCheck.reason || 'IT Governance lifecycle upgrade required.'
+                  }
+                };
+              }
+              return null;
             })
             .filter(Boolean) as { item: typeof project.techStack[0]; check: any }[];
 
@@ -445,7 +466,7 @@ export default function ProjectDetail({
                     <span>Outdated Tech Stack Warning ({outdatedItems.length} components)</span>
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    The following stack components are below the minimum recommended versions. Update actions are recommended to address security vulnerabilities and vendor support deprecation.
+                    The following stack components are below the minimum recommended versions or have been flagged for governance review by the AI Audit.
                   </p>
                   <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {outdatedItems.map(({ item, check }, idx) => (
@@ -480,7 +501,21 @@ export default function ProjectDetail({
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 text-sm">
                       {project.techStack.map((item, idx) => {
-                        const check = checkVersionStatus(item.technology, item.version);
+                        const staticCheck = checkVersionStatus(item.technology, item.version);
+                        
+                        // Find matching AI Audit recommendation
+                        const aiRec = audit?.recommendations?.find(r => {
+                          const layerMatch = r.layer.toLowerCase() === item.layer.toLowerCase();
+                          const currentTechWord = r.currentTech.split(' ')[0].toLowerCase();
+                          const techMatch = r.currentTech.toLowerCase().includes(item.technology.toLowerCase()) ||
+                                            item.technology.toLowerCase().includes(currentTechWord);
+                          return layerMatch && techMatch;
+                        });
+
+                        const isOutdated = staticCheck.isOutdated || !!aiRec;
+                        const latestVersion = aiRec?.recommendedTech || staticCheck.latestVersion || 'LTS Release';
+                        const reason = aiRec?.benefit || staticCheck.reason || 'IT Governance lifecycle upgrade required.';
+
                         return (
                           <tr key={idx} className="hover:bg-slate-900/20 transition-colors duration-150">
                             <td className="py-3.5 px-5 font-semibold text-slate-300">{item.layer}</td>
@@ -488,10 +523,10 @@ export default function ProjectDetail({
                             <td className="py-3.5 px-5 font-mono text-xs text-slate-400">
                               <div className="flex items-center gap-1.5">
                                 <span>{item.version}</span>
-                                {check.isOutdated && (
+                                {isOutdated && (
                                   <span 
                                     className="text-amber-500 cursor-help"
-                                    title={`Update recommended: ${check.latestVersion}. Reason: ${check.reason}`}
+                                    title={`Update recommended: ${latestVersion}. Reason: ${reason}`}
                                   >
                                     <AlertTriangle className="w-4 h-4 animate-pulse" />
                                   </span>
@@ -513,14 +548,29 @@ export default function ProjectDetail({
 
         {/* ARCHITECTURE TAB */}
         {activeTab === 'architecture' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
               <div>
                 <h3 className="text-base font-bold text-slate-200">System Flowchart</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Automated architecture visualization rendered directly from stack connections.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Automated architecture visualization rendered directly from specification documents.</p>
               </div>
             </div>
-            <MermaidChart chart={project.architectureDiagram} id={project.id} />
+
+            {!project.architectureDiagram ? (
+              <div className="glass-panel p-8 rounded-2xl text-center space-y-4 flex flex-col items-center justify-center">
+                <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+                  <Network className="w-6 h-6 text-slate-500" />
+                </div>
+                <div className="max-w-md">
+                  <h3 className="text-sm font-bold text-slate-200">No Flowchart Diagram Available</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    This project does not have an architecture diagram set up yet. Please upload a specification document in the Knowledge Base to generate it.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <MermaidChart chart={project.architectureDiagram} id={project.id} />
+            )}
           </div>
         )}
 
@@ -572,7 +622,7 @@ export default function ProjectDetail({
             ) : (
               <div className="space-y-6">
                 {/* Score and Core Metrics Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Circle Score Card */}
                   <div className="glass-panel p-5 rounded-2xl flex items-center justify-between gap-4">
                     <div>
@@ -603,21 +653,6 @@ export default function ProjectDetail({
                     }`}>
                       {audit.security}
                     </h3>
-                  </div>
-
-                  {/* Monthly Cloud Cost Card */}
-                  <div className="glass-panel p-5 rounded-2xl">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block font-medium">Cloud Hosting Cost</span>
-                    <div className="flex items-baseline gap-1 mt-2.5">
-                      <h3 className="text-xl font-bold text-slate-200">${audit.estimatedMonthlyCost.toLocaleString()}</h3>
-                      <span className="text-[10px] text-slate-500">/ mo</span>
-                    </div>
-                    {audit.potentialSavingPercent > 0 && (
-                      <span className="text-[10px] text-emerald-500 font-semibold block mt-1.5 flex items-center gap-0.5">
-                        <TrendingDown className="w-3.5 h-3.5" />
-                        Potential saving: {audit.potentialSavingPercent}%
-                      </span>
-                    )}
                   </div>
                 </div>
 
