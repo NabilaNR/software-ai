@@ -143,6 +143,40 @@ export const techCatalog: Record<string, TechRecommendation> = {
       return parseInt(match[1]) < 18;
     },
     reason: 'Node.js versions below 18 are End of Life. Upgrading is required to resolve engine compliance and ESM issues.'
+  },
+  jenkins: {
+    latestVersion: '2.452.x LTS',
+    minSupportedVersion: '2.426.0',
+    isOutdated: (v) => {
+      const match = v.match(/^(\d+)\.(\d+)/);
+      if (!match) return true; // outdated if version not parseable or too old
+      const major = parseInt(match[1]);
+      const minor = parseInt(match[2]);
+      return major < 2 || (major === 2 && minor < 426);
+    },
+    reason: 'Jenkins versions below 2.426 have severe security vulnerabilities (arbitrary file read CVE-2024-23897, XSS CVE-2023-24426). Upgrading to modern LTS secures controller-agent channels.'
+  },
+  docker: {
+    latestVersion: '26.x / 27.x',
+    minSupportedVersion: '20.10.0',
+    isOutdated: (v) => {
+      const match = v.match(/^(\d+)/);
+      if (!match) return false;
+      return parseInt(match[1]) < 20;
+    },
+    reason: 'Docker versions below 20.10 contain serious vulnerabilities (runc container escape CVE-2024-21626) and lack cgroup v2 systemd resource limiting compliance.'
+  },
+  kubernetes: {
+    latestVersion: '1.30.x',
+    minSupportedVersion: '1.26.0',
+    isOutdated: (v) => {
+      const match = v.match(/^(\d+)\.(\d+)/);
+      if (!match) return false;
+      const major = parseInt(match[1]);
+      const minor = parseInt(match[2]);
+      return major < 1 || (major === 1 && minor < 26);
+    },
+    reason: 'Kubernetes versions below 1.26 are EOL (End of Life). Upgrading is critical to support Pod Admission Standards and secure container namespaces.'
   }
 };
 
@@ -165,6 +199,9 @@ export function checkVersionStatus(techName: string, version: string): VersionCh
   else if (name.includes('kafka')) matchedKey = 'kafka';
   else if (name.includes('oracle')) matchedKey = 'oracle';
   else if (name.includes('wildfly') || name.includes('boss')) matchedKey = 'wildfly';
+  else if (name.includes('jenkins')) matchedKey = 'jenkins';
+  else if (name.includes('docker')) matchedKey = 'docker';
+  else if (name.includes('kubernetes') || name.includes('k8s')) matchedKey = 'kubernetes';
 
   if (matchedKey && techCatalog[matchedKey]) {
     const catalogItem = techCatalog[matchedKey];

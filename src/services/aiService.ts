@@ -70,8 +70,14 @@ export class AIService {
     projectInfo: string;
     documentsText?: string;
   }): Promise<AuditResponse> {
-    const systemPrompt = `You are a Senior Software Architect and Financial Auditor. 
-Your task is to audit the provided project tech stack and architecture. 
+    const systemPrompt = `You are a Senior Software Architect, Security Auditor, and IT Governance Consultant. 
+Your task is to audit the provided project tech stack and architecture.
+
+CRITICAL AUDIT INSTRUCTIONS:
+- The "benefit" field under each recommendation MUST be highly argumentative, technical, and comparative.
+- You must explicitly compare the currentTech (old version) with the recommendedTech (new version), stating exactly why the modern version is superior (e.g., specific CVE security vulnerabilities resolved, major database indexing optimization, cloud compute cost savings, or key architectural upgrades like virtual threads in Java 21).
+- Avoid generic descriptions like "improved security". Cite technical details, features, or compliance goals.
+
 You must respond strictly with a valid JSON object matching the following structure:
 {
   "overallScore": number (0-100),
@@ -87,7 +93,7 @@ You must respond strictly with a valid JSON object matching the following struct
       "layer": "Frontend" | "Backend" | "Database" | "Queue" | "Cache" | "Cloud" | "Container" | "CI/CD",
       "currentTech": "tech name and version",
       "recommendedTech": "tech name recommended",
-      "benefit": "detailed benefit explanation",
+      "benefit": "Highly technical, comparative reason of new version vs old version, citing specific advantages",
       "type": "cost" | "performance" | "database" | "queue" | "search"
     }
   ],

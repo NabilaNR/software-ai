@@ -55,7 +55,7 @@ You must respond strictly with a valid JSON object matching the following struct
       "risk": "Low" | "Medium" | "High" | "Critical"
     }
   ],
-  "architectureDiagram": "A clean, valid Mermaid.js flowchart code displaying the container flow of the extracted tech stack."
+  "architectureDiagram": "A clean, valid Mermaid.js flowchart code. It must strictly model the actual architecture flow, system integrations, data flow, and network topologies described in the document. Do NOT generate generic Client -> Backend -> DB diagrams unless that is the only flow described in the document. Translate the document's actual component layouts (e.g., API gateways, multiple microservices, specific database instances, message queues) into the flowchart."
 }
 
 Do not include any markdown code block wrappers (like \`\`\`json) in your output, respond with raw JSON only. Ensure the diagram is valid Mermaid code.`;
