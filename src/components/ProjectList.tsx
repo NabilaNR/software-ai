@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Project, TechStackItem } from '@/services/dummyData';
 import { AuditResponse, AIServiceConfig } from '@/services/aiService';
+import { IndexedDocument } from '@/services/ragService';
 import { 
   Search, 
   Layers, 
@@ -25,10 +26,19 @@ interface ProjectListProps {
   onSelectProject: (id: string) => void;
   onAddProject: (newProject: Project) => void;
   onDeleteProject: (projectId: string) => void;
+  onAddDocument: (doc: IndexedDocument) => void;
   config: AIServiceConfig | null;
 }
 
-export default function ProjectList({ projects, audits, onSelectProject, onAddProject, onDeleteProject, config }: ProjectListProps) {
+export default function ProjectList({ 
+  projects, 
+  audits, 
+  onSelectProject, 
+  onAddProject, 
+  onDeleteProject, 
+  onAddDocument,
+  config 
+}: ProjectListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -131,6 +141,24 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
 
       onAddProject(newProject);
       
+      // Automatically add document to knowledge base
+      const newDoc: IndexedDocument = {
+        id: `${Date.now()}-${file.name}`,
+        filename: file.name,
+        projectId: projectId,
+        text: extractedText,
+        sizeBytes: file.size,
+        status: 'Ready for AI',
+        uploadedAt: new Date().toLocaleDateString('id-ID', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
+      onAddDocument(newDoc);
+      
       // Reset Form State
       setName('');
       setDescription('');
@@ -163,9 +191,9 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="glass-panel p-6 rounded-2xl space-y-6 max-w-2xl">
+        <form onSubmit={handleSubmit} className="glass-panel p-8 rounded-3xl space-y-8 max-w-2xl shadow-xl border border-slate-850/60">
           {extractError && (
-            <div className="p-4 rounded-xl bg-red-950/40 border border-red-900/30 flex gap-3 text-xs text-red-200/90 leading-relaxed shadow-lg">
+            <div className="p-4 rounded-xl bg-red-950/20 border border-red-900/30 flex gap-3 text-xs text-red-400 leading-relaxed shadow-lg">
               <AlertCircle className="w-4.5 h-4.5 shrink-0 text-red-500 animate-pulse" />
               <div>
                 <span className="font-bold block mb-0.5 text-red-400">Onboarding Error</span>
@@ -174,38 +202,57 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
             </div>
           )}
 
+          {/* Section 1: Basic Information */}
           <div className="space-y-4">
-            {/* Project Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Project Name *</label>
-              <input
-                type="text"
-                required
-                disabled={isExtracting}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., BNI Cash Management Service"
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all disabled:opacity-50"
-              />
+            <div className="flex items-center gap-2 border-b border-slate-800/60 pb-2">
+              <Briefcase className="w-4 h-4 text-blue-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-350">Basic Information</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-4">
+              {/* Project Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400">Project Name *</label>
+                <input
+                  type="text"
+                  required
+                  disabled={isExtracting}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., BNI Cash Management Service"
+                  className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-105 placeholder-slate-600 transition-all disabled:opacity-50"
+                />
+              </div>
+
+              {/* Project Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400">Project Description (Optional)</label>
+                <textarea
+                  disabled={isExtracting}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Briefly describe the business goals or purpose of this system..."
+                  className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-105 placeholder-slate-600 transition-all disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Specification Document */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-800/60 pb-2">
+              <FileText className="w-4 h-4 text-blue-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-355">Specification Document</h3>
             </div>
 
-            {/* Project Description */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">Project Description (Optional)</label>
-              <textarea
-                disabled={isExtracting}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                placeholder="Briefly describe the business goals or purpose of this system..."
-                className="w-full text-xs bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 placeholder-slate-600 transition-all disabled:opacity-50"
-              />
-            </div>
-
-            {/* Document Upload */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400">System Architecture Spec / Document *</label>
-              <div className="relative border-2 border-dashed border-slate-800/80 hover:border-blue-500/40 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 bg-slate-950/40 transition-all duration-300">
+              <label className="text-xs font-semibold text-slate-400">Specification File *</label>
+              <div className={`relative border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 transition-all duration-300 ${
+                file 
+                  ? 'border-blue-500/50 bg-blue-950/10' 
+                  : 'border-slate-800/80 bg-slate-950/40 hover:border-blue-500/40'
+              }`}>
                 <input
                   type="file"
                   accept=".pdf,.docx,.txt,.md"
@@ -217,16 +264,20 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:pointer-events-none"
                 />
                 
-                <div className="w-12 h-12 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-450">
+                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-all ${
+                  file 
+                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 animate-pulse' 
+                    : 'bg-slate-900/80 border-slate-800 text-slate-450'
+                }`}>
                   {file ? (
-                    <FileText className="w-6 h-6 text-blue-400 animate-bounce" />
+                    <FileText className="w-6 h-6" />
                   ) : (
                     <Upload className="w-6 h-6" />
                   )}
                 </div>
 
                 <div className="text-center">
-                  <p className="text-xs font-bold text-slate-300">
+                  <p className={`text-xs font-bold transition-all ${file ? 'text-blue-450' : 'text-slate-300'}`}>
                     {file ? file.name : 'Choose a file or drag it here'}
                   </p>
                   <p className="text-[10px] text-slate-500 mt-1">
@@ -257,7 +308,7 @@ export default function ProjectList({ projects, audits, onSelectProject, onAddPr
             <button
               type="submit"
               disabled={isExtracting}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-700/60 text-white font-bold rounded-xl text-xs transition-all hover:scale-[1.02] disabled:hover:scale-100 disabled:opacity-80 cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-700/65 text-white font-bold rounded-xl text-xs transition-all hover:scale-[1.02] disabled:hover:scale-100 disabled:opacity-80 cursor-pointer shadow-md shadow-blue-500/10"
             >
               {isExtracting ? 'Extracting...' : 'Save & Extract stack using AI'}
             </button>

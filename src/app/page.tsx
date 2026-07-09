@@ -464,6 +464,7 @@ export default function Home() {
             onSelectProject={handleSelectProject} 
             onAddProject={handleAddProject}
             onDeleteProject={handleDeleteProject}
+            onAddDocument={handleAddDocument}
             config={config}
           />
         );
