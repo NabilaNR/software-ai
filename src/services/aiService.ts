@@ -148,7 +148,10 @@ Do not include any markdown formatting wrappers (like \`\`\`json) in your output
     const modelName = config.model || 'gemini-1.5-flash';
     const model = genAI.getGenerativeModel({
       model: modelName,
-      systemInstruction: systemPrompt
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        temperature: 0.2
+      }
     });
 
     const chatSession = model.startChat({
