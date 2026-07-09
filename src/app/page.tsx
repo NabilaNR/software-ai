@@ -303,6 +303,7 @@ export default function Home() {
             content: h.text
           })),
           project,
+          audit: audits[selectedProjectId] || null,
           config,
           documents: projectDocs
         })
@@ -358,9 +359,13 @@ export default function Home() {
             role: h.sender === 'user' ? 'user' : 'assistant',
             content: h.text
           })),
-          project: null, // General mode
+          project: null,
+          projects: projects.map(p => ({
+            ...p,
+            audit: audits[p.id] || null
+          })),
           config,
-          documents: documents // All documents loaded!
+          documents: documents
         })
       });
 

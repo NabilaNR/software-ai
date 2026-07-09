@@ -5,7 +5,7 @@ import { RAGService, IndexedDocument } from '@/services/ragService';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, history, project, config, documents } = body;
+    const { prompt, history, project, audit, projects, config, documents } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
@@ -49,11 +49,43 @@ export async function POST(request: NextRequest) {
     if (project) {
       projectContext = `
 Project Context:
-Name: ${project.name}
-Owner: ${project.owner}
-Description: ${project.description}
+- Name: ${project.name}
+- Owner: ${project.owner}
+- Description: ${project.description}
+- Tech Stack Details:
+${project.techStack.map((item: any) => `  * ${item.layer}: ${item.technology} (Version: ${item.version}, Support: ${item.supportStatus}, Risk: ${item.risk})`).join('\n')}
+`;
+
+      if (audit) {
+        projectContext += `
+Existing AI Audit Findings & Recommendations:
+- Overall Compliance Score: ${audit.overallScore}/100
+- Technology Health: ${audit.technologyHealth}
+- Security Grade: ${audit.security}
+- Scalability: ${audit.scalability}
+- Maintainability: ${audit.maintainability}
+- Critical Stack Risks:
+${(audit.topRisks || []).map((risk: string) => `  * ${risk}`).join('\n')}
+- Audit Recommendations & Approved Version Upgrades:
+${(audit.recommendations || []).map((rec: any) => `  * Layer: ${rec.layer} | Current Tech: ${rec.currentTech} | Recommended Upgrade: ${rec.recommendedTech} (Benefit: ${rec.benefit})`).join('\n')}
+`;
+      }
+    } else if (projects && projects.length > 0) {
+      projectContext = `
+Ecosystem Project Catalog Context:
+${projects.map((p: any) => `
+Project: ${p.name} (Owner: ${p.owner})
+Description: ${p.description}
 Tech Stack Details:
-${project.techStack.map((item: any) => `- ${item.layer}: ${item.technology} (Version: ${item.version}, Support: ${item.supportStatus}, Risk: ${item.risk})`).join('\n')}
+${p.techStack.map((item: any) => `  * ${item.layer}: ${item.technology} (Version: ${item.version}, Support: ${item.supportStatus}, Risk: ${item.risk})`).join('\n')}
+${p.audit ? `AI Audit Report findings:
+- Tech Health: ${p.audit.technologyHealth}
+- Security: ${p.audit.security}
+- Overall Score: ${p.audit.overallScore}/100
+- Approved Recommendations:
+${(p.audit.recommendations || []).map((rec: any) => `  * Layer: ${rec.layer} | Current Tech: ${rec.currentTech} | Recommended Upgrade: ${rec.recommendedTech} (Benefit: ${rec.benefit})`).join('\n')}
+` : '- No AI Audit Report has been generated for this project yet.'}
+`).join('\n\n')}
 `;
     }
 
