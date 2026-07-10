@@ -11,18 +11,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    if (!config || !config.apiKey || !config.apiKey.trim()) {
+    const configFromEnv: AIServiceConfig = {
+      provider: config?.provider,
+      apiKey: config?.apiKey,
+      model: config?.model
+    };
+
+    const resolvedConfig = AIService.resolveConfig(configFromEnv);
+
+    if (!resolvedConfig.apiKey || !resolvedConfig.apiKey.trim()) {
       return NextResponse.json(
-        { error: 'API Key is required for AI Chat. Please configure it in the Settings page.' },
+        { error: 'API Key is required for AI Chat. Please configure it in the Settings page or on the server.' },
         { status: 400 }
       );
     }
-
-    const aiConfig: AIServiceConfig = {
-      provider: config.provider,
-      apiKey: config.apiKey,
-      model: config.model
-    };
 
     // 1. Intelligent RAG context retrieval
     const docList = (documents || []) as IndexedDocument[];
@@ -112,7 +114,7 @@ CRITICAL CONVERSATIONAL INSTRUCTIONS:
     const combinedContext = `${projectContext}\n\n=== RETRIEVED DOCUMENTATION ===\n${retrievedContext}`;
 
     const reply = await AIService.chat({
-      config: aiConfig,
+      config: resolvedConfig,
       prompt,
       systemPrompt,
       context: combinedContext,

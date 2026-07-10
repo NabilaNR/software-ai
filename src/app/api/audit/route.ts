@@ -10,30 +10,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project details are required' }, { status: 400 });
     }
 
-    if (!config || !config.apiKey || !config.apiKey.trim()) {
+    const configFromEnv: AIServiceConfig = {
+      provider: config?.provider,
+      apiKey: config?.apiKey,
+      model: config?.model
+    };
+
+    const resolvedConfig = AIService.resolveConfig(configFromEnv);
+
+    if (!resolvedConfig.apiKey || !resolvedConfig.apiKey.trim()) {
       return NextResponse.json(
-        { error: 'API Key is required for live AI Audits. Please add your key in the Settings page.' },
+        { error: 'API Key is required for live AI Audits. Please add your key in the Settings page or on the server.' },
         { status: 400 }
       );
     }
-
-    const aiConfig: AIServiceConfig = {
-      provider: config.provider,
-      apiKey: config.apiKey,
-      model: config.model
-    };
 
     const projectInfoString = `
 Project Name: ${project.name}
 Owner: ${project.owner}
 Description: ${project.description}
-Estimated Monthly Cloud Cost: $${project.estimatedMonthlyCost}
 Tech Stack Details:
 ${project.techStack.map((item: any) => `- ${item.layer}: ${item.technology} (Version: ${item.version}, Support: ${item.supportStatus}, Risk: ${item.risk})`).join('\n')}
 `;
 
     const auditResponse = await AIService.auditProject({
-      config: aiConfig,
+      config: resolvedConfig,
       projectInfo: projectInfoString,
       documentsText
     });

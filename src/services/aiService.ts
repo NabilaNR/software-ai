@@ -32,6 +32,26 @@ export interface AuditResponse {
 }
 
 export class AIService {
+  public static resolveConfig(config: AIServiceConfig): AIServiceConfig {
+    const provider = config?.provider || (process.env.AI_PROVIDER as any) || 'gemini';
+    let apiKey = config?.apiKey || '';
+    
+    if (!apiKey || !apiKey.trim()) {
+      if (provider === 'gemini') apiKey = process.env.GEMINI_API_KEY || '';
+      else if (provider === 'openai') apiKey = process.env.OPENAI_API_KEY || '';
+      else if (provider === 'claude') apiKey = process.env.ANTHROPIC_API_KEY || '';
+      else if (provider === 'openrouter') apiKey = process.env.OPENROUTER_API_KEY || '';
+    }
+
+    const model = config?.model || process.env.AI_MODEL || '';
+
+    return {
+      provider,
+      apiKey,
+      model
+    };
+  }
+
   static async chat({
     config,
     prompt,
@@ -45,19 +65,20 @@ export class AIService {
     context?: string;
     history?: { role: 'user' | 'assistant'; content: string }[];
   }): Promise<string> {
+    const resolvedConfig = this.resolveConfig(config);
     const fullSystemPrompt = `${systemPrompt}\n\nContext:\n${context || 'No specific document context provided.'}`;
 
-    switch (config.provider) {
+    switch (resolvedConfig.provider) {
       case 'gemini':
-        return this.callGemini({ config, prompt, systemPrompt: fullSystemPrompt, history });
+        return this.callGemini({ config: resolvedConfig, prompt, systemPrompt: fullSystemPrompt, history });
       case 'openai':
-        return this.callOpenAI({ config, prompt, systemPrompt: fullSystemPrompt, history });
+        return this.callOpenAI({ config: resolvedConfig, prompt, systemPrompt: fullSystemPrompt, history });
       case 'claude':
-        return this.callClaude({ config, prompt, systemPrompt: fullSystemPrompt, history });
+        return this.callClaude({ config: resolvedConfig, prompt, systemPrompt: fullSystemPrompt, history });
       case 'openrouter':
-        return this.callOpenRouter({ config, prompt, systemPrompt: fullSystemPrompt, history });
+        return this.callOpenRouter({ config: resolvedConfig, prompt, systemPrompt: fullSystemPrompt, history });
       default:
-        throw new Error(`Unsupported provider: ${config.provider}`);
+        throw new Error(`Unsupported provider: ${resolvedConfig.provider}`);
     }
   }
 
@@ -157,7 +178,7 @@ Do not include any markdown formatting wrappers (like \`\`\`json) in your output
       model: modelName,
       systemInstruction: systemPrompt,
       generationConfig: {
-        temperature: 0.2
+        temperature: 0.0
       }
     });
 
@@ -203,7 +224,7 @@ Do not include any markdown formatting wrappers (like \`\`\`json) in your output
       body: JSON.stringify({
         model: modelName,
         messages,
-        temperature: 0.2
+        temperature: 0.0
       })
     });
 
@@ -243,7 +264,7 @@ Do not include any markdown formatting wrappers (like \`\`\`json) in your output
           { role: 'user', content: prompt }
         ],
         max_tokens: 4096,
-        temperature: 0.2
+        temperature: 0.0
       })
     });
 
@@ -283,7 +304,7 @@ Do not include any markdown formatting wrappers (like \`\`\`json) in your output
       body: JSON.stringify({
         model: modelName,
         messages,
-        temperature: 0.2
+        temperature: 0.0
       })
     });
 

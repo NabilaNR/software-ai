@@ -12,18 +12,20 @@ export async function POST(request: NextRequest) {
     if (!documentText) {
       return NextResponse.json({ error: 'Specification document text is required' }, { status: 400 });
     }
-    if (!config || !config.apiKey || !config.apiKey.trim()) {
+    const configFromEnv: AIServiceConfig = {
+      provider: config?.provider,
+      apiKey: config?.apiKey,
+      model: config?.model
+    };
+
+    const resolvedConfig = AIService.resolveConfig(configFromEnv);
+
+    if (!resolvedConfig.apiKey || !resolvedConfig.apiKey.trim()) {
       return NextResponse.json(
-        { error: 'API Key is required to extract project profiles. Please configure it in Settings.' },
+        { error: 'API Key is required to extract project profiles. Please configure it in Settings or on the server.' },
         { status: 400 }
       );
     }
-
-    const aiConfig: AIServiceConfig = {
-      provider: config.provider,
-      apiKey: config.apiKey,
-      model: config.model
-    };
 
     const systemPrompt = `You are a Senior Software Architect and IT Governance Consultant for Bank Negara Indonesia (BNI).
 Your task is to analyze the provided software specification document and extract the project architecture details. You must act as a highly accurate systems analyst.
@@ -71,7 +73,7 @@ Do not include any markdown code block wrappers (like \`\`\`json) in your output
     const prompt = `Project Name: ${projectName}\n\nDocument Text:\n${documentText}\n\nPlease parse this document and return the structured JSON project profile.`;
 
     const rawResponse = await AIService.chat({
-      config: aiConfig,
+      config: resolvedConfig,
       prompt,
       systemPrompt,
       context: documentText

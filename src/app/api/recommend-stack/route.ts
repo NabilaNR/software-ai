@@ -9,18 +9,20 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json({ error: 'Project name is required' }, { status: 400 });
     }
-    if (!config || !config.apiKey || !config.apiKey.trim()) {
+    const configFromEnv: AIServiceConfig = {
+      provider: config?.provider,
+      apiKey: config?.apiKey,
+      model: config?.model
+    };
+
+    const resolvedConfig = AIService.resolveConfig(configFromEnv);
+
+    if (!resolvedConfig.apiKey || !resolvedConfig.apiKey.trim()) {
       return NextResponse.json(
-        { error: 'API Key is required to generate recommendations. Please configure it in Settings.' },
+        { error: 'API Key is required to generate recommendations. Please configure it in Settings or on the server.' },
         { status: 400 }
       );
     }
-
-    const aiConfig: AIServiceConfig = {
-      provider: config.provider,
-      apiKey: config.apiKey,
-      model: config.model
-    };
 
     const systemPrompt = `You are a Senior Enterprise Architect and IT Strategy Consultant for Bank Negara Indonesia (BNI).
 Your task is to recommend a modern, robust, secure, and compliant technology stack for a BNI banking system based on its name and description.
@@ -51,7 +53,7 @@ Do not include any markdown code block wrappers (like \`\`\`json) in your output
     const prompt = `System Name: ${name}\nSystem Description: ${description || 'No description provided.'}\n\nPlease recommend a suitable technology stack for this system.`;
 
     const rawResponse = await AIService.chat({
-      config: aiConfig,
+      config: resolvedConfig,
       prompt,
       systemPrompt
     });
